@@ -1,0 +1,37 @@
+name: AlgoFleet Scan
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: algofleet-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run scan
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SCAN_MODES: ${{ vars.SCAN_MODES || 'intraday' }}
+        run: node scan.mjs
+      - name: Persist dedup state
+        run: |
+          if [[ -n "$(git status --porcelain state.json)" ]]; then
+            git config user.name  "algofleet-bot"
+            git config user.email "bot@algofleet.local"
+            git add state.json
+            git commit -m "chore: update scan state [skip ci]"
+            git push
+          fi
